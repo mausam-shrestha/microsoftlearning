@@ -5,8 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Azure;
 
-// Add Azure OpenAI package
-
+using Azure.AI.OpenAI;
 
 // Build a config object and retrieve user settings.
 IConfiguration config = new ConfigurationBuilder()
@@ -26,11 +25,17 @@ do {
     Console.WriteLine("\nUsing system message from system.txt");
     string systemMessage = System.IO.File.ReadAllText("system.txt"); 
     systemMessage = systemMessage.Trim();
+    
 
     Console.WriteLine("\nEnter user message or type 'quit' to exit:");
     string userMessage = Console.ReadLine() ?? "";
     userMessage = userMessage.Trim();
-    
+
+    // Format and send the request to the model
+    Console.WriteLine("\nAdding grounding context from grounding.txt");
+    string groundingText = System.IO.File.ReadAllText("grounding.txt");
+    userMessage = groundingText + userMessage;
+
     if (systemMessage.ToLower() == "quit" || userMessage.ToLower() == "quit")
     {
         break;
@@ -56,11 +61,21 @@ async Task GetResponseFromOpenAI(string systemMessage, string userMessage)
         return;
     }
     
-    // Configure the Azure OpenAI client
+    OpenAIClient client = new OpenAIClient(new Uri(oaiEndpoint), new AzureKeyCredential(oaiKey));
 
+    var chatCompletionOptions = new ChatCompletionsOptions()
+    {
+        Messages =
+        {
+            new ChatRequestSystemMessage(systemMessage),
+            new ChatRequestUserMessage(userMessage)
+        },
+        Temperature = 0.7f,
+        MaxTokens = 800,
+        DeploymentName = oaiDeploymentName
+    };
 
-    // Format and send the request to the model
-
+    Response<ChatCompletions> response = await client.GetChatCompletionsAsync(chatCompletionOptions);
     
     ChatCompletions completions = response.Value;
     string completion = completions.Choices[0].Message.Content;
